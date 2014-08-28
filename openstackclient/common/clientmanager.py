@@ -49,7 +49,7 @@ class ClientManager(object):
                  user_domain_id=None, user_domain_name=None,
                  project_domain_id=None, project_domain_name=None,
                  region_name=None, api_version=None, verify=True,
-                 trust_id=None, timing=None):
+                 trust_id=None, timing=None, federated=False):
         self._token = token
         self._url = url
         self._auth_url = auth_url
@@ -68,6 +68,7 @@ class ClientManager(object):
         self._trust_id = trust_id
         self._service_catalog = None
         self.timing = timing
+        self.federated = federated
 
         # verify is the Requests-compatible form
         self._verify = verify

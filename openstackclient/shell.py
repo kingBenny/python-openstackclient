@@ -328,6 +328,10 @@ class OpenStackShell(app.App):
             help='Trust ID to use when authenticating. '
                  'This can only be used with Keystone v3 API '
                  '(Env: OS_TRUST_ID)')
+        parser.add_argument('--federated', '-F',
+                            dest="federated",
+                            action='store_true',
+                            help="Login via Federated Authentication")
 
         return parser
 
@@ -348,13 +352,34 @@ class OpenStackShell(app.App):
                     " either --os-url or env[OS_URL]")
 
         else:
-            # Validate password flow auth
-            if not self.options.os_username:
-                raise exc.CommandError(
-                    "You must provide a username via"
-                    " either --os-username or env[OS_USERNAME]")
+            if self.options.federated:
+                #check for an environment variable and a valid v3 auth_url
+                if "OS_IDENTITY_API_VERSION" in os.environ:
+                    if os.environ.get('OS_IDENTITY_API_VERSION') != '3' \
+                                or 'v2' in self.options.os_auth_url \
+                                or 'V2' in self.options.os_auth_url:
+                        raise exc.CommandError(
+                        "Federated authentication has only been, "
+                        "configured to work with the v3 API "
+                        "you must set env[OS_IDENTITY_API_VERSION]=3 "
+                        "and target a v3 Keystone endpoint.")
+                else:
+                    raise exc.CommandError(
+                        "If using Federated authentication,"
+                        " you must set env[OS_IDENTITY_API_VERSION]=3 ")
+                if not self.options.os_auth_url:
+                    raise exc.CommandError(
+                        "If using Federated authentication,"
+                        " you must specify an endpoint with "
+                        "--os-auth-url")
+            else:
+                # Validate password flow auth
+                if not self.options.os_username:
+                    raise exc.CommandError(
+                        "You must provide a username via"
+                        " either --os-username or env[OS_USERNAME]")
 
-            if not self.options.os_password:
+            if not self.options.os_password and not self.options.federated:
                 # No password, if we've got a tty, try prompting for it
                 if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
                     # Check for Ctl-D
@@ -365,23 +390,38 @@ class OpenStackShell(app.App):
                 # No password because we did't have a tty or the
                 # user Ctl-D when prompted?
                 if not self.options.os_password:
-                    raise exc.CommandError(
-                        "You must provide a password via"
-                        " either --os-password, or env[OS_PASSWORD], "
-                        " or prompted response")
+                    # No password, if we've got a tty, try prompting for it
+                    if hasattr(sys.stdin, 'isatty') and sys.stdin.isatty():
+                        # Check for Ctl-D
+                        try:
+                            self.options.os_password = getpass.getpass()
+                        except EOFError:
+                            pass
+                    # No password because we did't have a tty or the
+                    # user Ctl-D when prompted?
+                    if not self.options.os_password:
+                        raise exc.CommandError(
+                            "You must provide a password via"
+                            " either --os-password, or env[OS_PASSWORD], "
+                            " or prompted response")
 
-            if not ((self.options.os_project_id
-                    or self.options.os_project_name) or
-                    (self.options.os_domain_id
-                    or self.options.os_domain_name) or
-                    self.options.os_trust_id):
-                raise exc.CommandError(
-                    "You must provide authentication scope as a project "
-                    "or a domain via --os-project-id or env[OS_PROJECT_ID], "
-                    "--os-project-name or env[OS_PROJECT_NAME], "
-                    "--os-domain-id or env[OS_DOMAIN_ID], or"
-                    "--os-domain-name or env[OS_DOMAIN_NAME], or "
-                    "--os-trust-id or env[OS_TRUST_ID].")
+                if not ((self.options.os_project_id
+                        or self.options.os_project_name) or
+                        (self.options.os_domain_id
+                        or self.options.os_domain_name) or
+                        self.options.os_trust_id):
+                    raise exc.CommandError(
+                        "You must provide authentication scope as a project "
+                        "or a domain via --os-project-id or env[OS_PROJECT_ID], "
+                        "--os-project-name or env[OS_PROJECT_NAME], "
+                        "--os-domain-id or env[OS_DOMAIN_ID], or"
+                        "--os-domain-name or env[OS_DOMAIN_NAME], or "
+                        "--os-trust-id or env[OS_TRUST_ID].")
+
+                if not self.options.os_auth_url:
+                    raise exc.CommandError(
+                        "You must provide an auth url via"
+                        " either --os-auth-url or via env[OS_AUTH_URL]")
 
             if not self.options.os_auth_url:
                 raise exc.CommandError(
@@ -421,6 +461,7 @@ class OpenStackShell(app.App):
             timing=self.options.timing,
             api_version=self.api_version,
             trust_id=self.options.os_trust_id,
+            federated=self.options.federated
         )
         return
 

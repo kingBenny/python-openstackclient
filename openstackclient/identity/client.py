@@ -21,7 +21,7 @@ from openstackclient.common import utils
 
 LOG = logging.getLogger(__name__)
 
-DEFAULT_IDENTITY_API_VERSION = '2.0'
+DEFAULT_IDENTITY_API_VERSION = '3'
 API_VERSION_OPTION = 'os_identity_api_version'
 API_NAME = 'identity'
 API_VERSIONS = {
@@ -65,6 +65,7 @@ def make_client(instance):
             cacert=instance._cacert,
             insecure=instance._insecure,
             trust_id=instance._trust_id,
+            federated=instance.federated,
         )
         instance.auth_ref = client.auth_ref
     return client
